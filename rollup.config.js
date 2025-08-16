@@ -3,7 +3,13 @@ import { defineConfig } from 'rollup'
 
 export default defineConfig({
   input: './src/index.ts',
-  plugins: [typescript()],
+  plugins: [
+    typescript({
+      module: 'esnext',
+      declaration: false,
+      declarationMap: false,
+    })
+  ],
   output: [
     {
       file: './dist/index.esm.js',
