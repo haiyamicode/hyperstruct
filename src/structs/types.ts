@@ -80,11 +80,27 @@ export function boolean(): Struct<boolean, null> {
  */
 
 export function date(): Struct<Date, null> {
-  return define("date", (value) => {
-    return (
-      (value instanceof Date && !Number.isNaN(value.getTime())) ||
-      `Expected a valid \`Date\` object, but received: ${print(value)}`
-    );
+  return new Struct({
+    type: "date",
+    schema: null,
+    coercer(value) {
+      if (value instanceof Date) {
+        return value;
+      }
+      if (typeof value === "string" || typeof value === "number") {
+        const date = new Date(value);
+        if (!Number.isNaN(date.getTime())) {
+          return date;
+        }
+      }
+      return value;
+    },
+    validator(value) {
+      return (
+        (value instanceof Date && !Number.isNaN(value.getTime())) ||
+        `Expected a valid \`Date\` object, but received: ${print(value)}`
+      );
+    },
   });
 }
 
