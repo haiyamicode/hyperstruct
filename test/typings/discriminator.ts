@@ -4,13 +4,14 @@ import {
   enums,
   type Infer,
   number,
+  object,
   string,
 } from "../../src";
 
 // Basic discriminator
 const User = discriminator("type", {
-  user: { id: string(), name: string() },
-  admin: { id: string(), permissions: number() },
+  user: object({ id: string(), name: string() }),
+  admin: object({ id: string(), permissions: number() }),
 });
 
 type UserType = Infer<typeof User>;
@@ -31,18 +32,18 @@ const validAdmin: UserType = {
 
 // Complex discriminator
 const Event = discriminator("eventType", {
-  USER_CREATED: {
+  USER_CREATED: object({
     id: string(),
     name: string(),
-  },
-  USER_PAYMENT_PLAN_CHANGED: {
+  }),
+  USER_PAYMENT_PLAN_CHANGED: object({
     id: string(),
     plan: enums(["FREE", "PAID"]),
-  },
-  USER_DELETED: {
+  }),
+  USER_DELETED: object({
     id: string(),
     softDelete: boolean(),
-  },
+  }),
 });
 
 type EventType = Infer<typeof Event>;

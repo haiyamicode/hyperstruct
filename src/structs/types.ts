@@ -1,5 +1,6 @@
 import { type Infer, Struct } from "../struct";
 import { define } from "../structs/define";
+import { assign } from "../structs/utilities";
 import {
   type AnyStruct,
   type InferStructTuple,
@@ -564,100 +565,141 @@ export function unknown(): Struct<unknown, null> {
   return define("unknown", () => true);
 }
 
+// Type definitions copied from @birchill/discriminator
+
+export type DiscriminatorSchema<
+  FieldType extends string,
+  MappingType extends Record<string, Struct<any, any>>,
+> = { field: FieldType; mapping: MappingType };
+
+type ConvertToUnion<T> = T[keyof T];
+
+type Flatten<T> = T extends object
+  ? {
+      [P in keyof T]: Flatten<T[P]>;
+    }
+  : T;
+
+type DiscriminatorType<
+  FieldType extends string,
+  MappingType,
+> = MappingType extends Record<string, any>
+  ? Flatten<
+      ConvertToUnion<{
+        [K in keyof MappingType]: { [P in FieldType]: K } & Infer<
+          MappingType[K]
+        >;
+      }>
+    >
+  : never;
+
+// Helper function copied from @birchill/discriminator
+function discriminatorPrint(value: any): string {
+  if (
+    typeof value === "string" ||
+    (typeof value === "object" && value.toString === Object.prototype.toString)
+  ) {
+    return JSON.stringify(value);
+  }
+  return `${value}`;
+}
+
+function discriminatorIsObject(a: unknown): a is Record<string, any> {
+  return typeof a === "object" && a !== null && !Array.isArray(a);
+}
+
+// Similar to assign() but only takes two arguments and if the first argument
+// is a discriminator(), it merges the properties of an object() or type()
+// into the discriminator()'s various branches.
+function extend<
+  A extends
+    | ObjectSchema
+    | DiscriminatorSchema<any, Record<string, Struct<any, any>>>,
+  B extends ObjectSchema,
+>(a: Struct<any, A>, b: Struct<any, B>): Struct<any, any> {
+  if (a.type === "discriminator") {
+    const discriminatorSchema = a.schema as DiscriminatorSchema<
+      any,
+      Record<string, Struct<any, any>>
+    >;
+    const mapping: Record<string, Struct<any, any>> = {};
+    for (const [key, value] of Object.entries(discriminatorSchema.mapping)) {
+      mapping[key] = assign(value, b);
+    }
+    return discriminator(discriminatorSchema.field, mapping);
+  }
+
+  return assign(a as Struct<any, ObjectSchema>, b);
+}
+
 /**
  * Ensure that a value matches one of a set of types based on a discriminator property.
  * This provides better error messages and type inference compared to regular unions.
+ *
+ * Implementation copied from @birchill/discriminator
  */
-
 export function discriminator<
-  D extends string,
-  T extends Record<string, ObjectSchema>
+  FieldType extends string,
+  MappingType extends Record<string, Struct<any, any>>,
 >(
-  discriminant: D,
-  options: T
+  field: FieldType,
+  mapping: MappingType
 ): Struct<
-  {
-    [K in keyof T]: ObjectType<T[K]> & Record<D, K>;
-  }[keyof T],
-  null
+  DiscriminatorType<FieldType, MappingType>,
+  DiscriminatorSchema<FieldType, MappingType>
 > {
-  const keys = Object.keys(options);
-  const cache = new Map<string, Struct<any>>();
+  const keys = Object.keys(mapping);
+
+  const getStructForValue = (value: unknown): Struct<any, any> | undefined => {
+    if (
+      !discriminatorIsObject(value) ||
+      typeof value[field] !== "string" ||
+      !keys.includes(value[field])
+    ) {
+      return undefined;
+    }
+
+    const branch = value[field];
+    const branchStruct = mapping[branch];
+    if (!branchStruct) {
+      return undefined;
+    }
+
+    return extend(branchStruct, object({ [field]: literal(branch) }));
+  };
 
   return new Struct({
     type: "discriminator",
-    schema: null,
-    coercer(value) {
-      if (!isObject(value)) {
-        return value;
+    schema: { field, mapping },
+    *entries(value: unknown, context) {
+      const struct = getStructForValue(value);
+      if (struct) {
+        yield* struct.entries(value, context);
       }
-
-      const tag = (value as any)[discriminant];
-      if (typeof tag !== "string" || !options[tag]) {
-        return value;
-      }
-
-      let struct = cache.get(tag);
-      if (!struct) {
-        const schema = {
-          ...options[tag],
-          [discriminant]: literal(tag),
-        };
-        struct = object(schema);
-        cache.set(tag, struct);
-      }
-
-      const [error, coerced] = struct.validate(value, { coerce: true });
-      return error ? value : coerced;
     },
-    validator(value, ctx) {
-      if (!isObject(value)) {
-        return `Expected an object, but received: ${print(value)}`;
+    validator(value: unknown, context) {
+      if (!discriminatorIsObject(value)) {
+        return `Expected an object, but received: ${discriminatorPrint(value)}`;
       }
 
-      const tag = (value as any)[discriminant];
-      if (typeof tag !== "string") {
-        return `Expected property \`${discriminant}\` to be a string, but received: ${print(tag)}`;
+      if (!(field in value) || typeof value[field] !== "string") {
+        return `Expected an object with '${field}' property, but received: ${discriminatorPrint(
+          value
+        )}`;
       }
 
-      if (!options[tag]) {
-        const validTags = keys.map((key) => `"${key}"`).join(", ");
-        return `Expected property \`${discriminant}\` to be one of ${validTags}, but received: "${tag}"`;
+      if (!keys.includes(value[field])) {
+        return `Expected '${field}' to be one of ${keys
+          .map((key) => `'${key}'`)
+          .join(", ")}, but received: '${value[field]}'`;
       }
 
-      let struct = cache.get(tag);
+      const struct = getStructForValue(value);
       if (!struct) {
-        const schema = {
-          ...options[tag],
-          [discriminant]: literal(tag),
-        };
-        struct = object(schema);
-        cache.set(tag, struct);
+        return true;
       }
 
-      return struct.validator(value, ctx);
-    },
-    *entries(value, ctx) {
-      if (!isObject(value)) {
-        return;
-      }
-
-      const tag = (value as any)[discriminant];
-      if (typeof tag !== "string" || !options[tag]) {
-        return;
-      }
-
-      let struct = cache.get(tag);
-      if (!struct) {
-        const schema = {
-          ...options[tag],
-          [discriminant]: literal(tag),
-        };
-        struct = object(schema);
-        cache.set(tag, struct);
-      }
-
-      yield* struct.entries(value, ctx);
+      return struct.validator(value, context);
     },
   });
 }

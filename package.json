@@ -1,7 +1,7 @@
 {
   "name": "@haiyami/hyperstruct",
   "description": "A simple and composable way to validate data in JavaScript (and TypeScript).",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -57,7 +57,7 @@
     "test:mocha": "mocha --require ./test/register.cjs --require source-map-support/register ./test/index.ts",
     "test:types": "tsc --noEmit && tsc --project ./test/tsconfig.json --noEmit",
     "watch": "npm run build -- --watch",
-    "precommit": "npm run format && npm run lint:fix && npm run check:fix && npm run test"
+    "precommit": "npm run format && npm run check:fix && npm run lint:fix && npm run test"
   },
   "keywords": [
     "api",

@@ -2,17 +2,17 @@ import * as h from "../dist/index.js";
 
 // Define a simple discriminated union for different shapes
 const Shape = h.discriminator("kind", {
-  circle: {
+  circle: h.object({
     radius: h.number(),
-  },
-  rectangle: {
+  }),
+  rectangle: h.object({
     width: h.number(),
     height: h.number(),
-  },
-  triangle: {
+  }),
+  triangle: h.object({
     base: h.number(),
     height: h.number(),
-  },
+  }),
 });
 
 // TypeScript type inference
@@ -40,7 +40,7 @@ const triangle: ShapeType = {
 function calculateArea(shape: unknown): number {
   // Validate the shape first
   const validShape = h.create(shape, Shape);
-  
+
   switch (validShape.kind) {
     case "circle":
       return Math.PI * validShape.radius ** 2;

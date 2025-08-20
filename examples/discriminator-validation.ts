@@ -3,28 +3,28 @@ import * as h from "../dist/index.js";
 // Define a discriminated union for different event types
 const Event = h.discriminator("type", {
   // User creation event
-  user_created: {
+  user_created: h.object({
     id: h.string(),
     name: h.string(),
     email: h.string(),
     created_at: h.string(),
-  },
-  
+  }),
+
   // User payment plan change event
-  user_payment_plan_changed: {
+  user_payment_plan_changed: h.object({
     id: h.string(),
     plan: h.enums(["FREE", "PAID", "ENTERPRISE"]),
     billing_cycle: h.enums(["MONTHLY", "YEARLY"]),
     changed_at: h.string(),
-  },
-  
+  }),
+
   // User deletion event
-  user_deleted: {
+  user_deleted: h.object({
     id: h.string(),
     soft_delete: h.boolean(),
     deleted_by: h.string(),
     deleted_at: h.string(),
-  },
+  }),
 });
 
 // TypeScript type inference
@@ -111,16 +111,20 @@ function processEvent(event: unknown) {
   try {
     // Validate and get typed event
     const validEvent = h.create(event, Event);
-    
+
     switch (validEvent.type) {
       case "user_created":
-        console.log(`New user created: ${validEvent.name} (${validEvent.email})`);
+        console.log(
+          `New user created: ${validEvent.name} (${validEvent.email})`
+        );
         break;
       case "user_payment_plan_changed":
         console.log(`User ${validEvent.id} changed to ${validEvent.plan} plan`);
         break;
       case "user_deleted":
-        console.log(`User ${validEvent.id} deleted ${validEvent.soft_delete ? "(soft)" : "(hard)"}`);
+        console.log(
+          `User ${validEvent.id} deleted ${validEvent.soft_delete ? "(soft)" : "(hard)"}`
+        );
         break;
     }
   } catch (error) {

@@ -1,8 +1,8 @@
-import { discriminator, string, number } from "../../../src";
+import { discriminator, number, object, string } from "../../../src";
 
 export const Struct = discriminator("type", {
-  user: { id: string(), name: string() },
-  admin: { id: string(), permissions: number() },
+  user: object({ id: string(), name: string() }),
+  admin: object({ id: string(), permissions: number() }),
 });
 
 export const data = "not an object";

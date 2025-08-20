@@ -1,10 +1,10 @@
 import assert from "assert";
-import { discriminator, string, number } from "../../src";
+import { discriminator, number, object, string } from "../../src";
 
 describe("discriminator", () => {
   const Struct = discriminator("type", {
-    user: { id: string(), name: string() },
-    admin: { id: string(), permissions: number() },
+    user: object({ id: string(), name: string() }),
+    admin: object({ id: string(), permissions: number() }),
   });
 
   describe("assert", () => {
@@ -108,5 +108,4 @@ describe("discriminator", () => {
       assert(error.message.includes("Expected property `type` to be a string"));
     });
   });
-
 });
