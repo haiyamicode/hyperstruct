@@ -5,3 +5,4 @@ tmp/
 .DS_Store
 *.local.md
 dist/
+local/

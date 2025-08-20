@@ -564,6 +564,104 @@ export function unknown(): Struct<unknown, null> {
   return define("unknown", () => true);
 }
 
+/**
+ * Ensure that a value matches one of a set of types based on a discriminator property.
+ * This provides better error messages and type inference compared to regular unions.
+ */
+
+export function discriminator<
+  D extends string,
+  T extends Record<string, ObjectSchema>
+>(
+  discriminant: D,
+  options: T
+): Struct<
+  {
+    [K in keyof T]: ObjectType<T[K]> & Record<D, K>;
+  }[keyof T],
+  null
+> {
+  const keys = Object.keys(options);
+  const cache = new Map<string, Struct<any>>();
+
+  return new Struct({
+    type: "discriminator",
+    schema: null,
+    coercer(value) {
+      if (!isObject(value)) {
+        return value;
+      }
+
+      const tag = (value as any)[discriminant];
+      if (typeof tag !== "string" || !options[tag]) {
+        return value;
+      }
+
+      let struct = cache.get(tag);
+      if (!struct) {
+        const schema = {
+          ...options[tag],
+          [discriminant]: literal(tag),
+        };
+        struct = object(schema);
+        cache.set(tag, struct);
+      }
+
+      const [error, coerced] = struct.validate(value, { coerce: true });
+      return error ? value : coerced;
+    },
+    validator(value, ctx) {
+      if (!isObject(value)) {
+        return `Expected an object, but received: ${print(value)}`;
+      }
+
+      const tag = (value as any)[discriminant];
+      if (typeof tag !== "string") {
+        return `Expected property \`${discriminant}\` to be a string, but received: ${print(tag)}`;
+      }
+
+      if (!options[tag]) {
+        const validTags = keys.map((key) => `"${key}"`).join(", ");
+        return `Expected property \`${discriminant}\` to be one of ${validTags}, but received: "${tag}"`;
+      }
+
+      let struct = cache.get(tag);
+      if (!struct) {
+        const schema = {
+          ...options[tag],
+          [discriminant]: literal(tag),
+        };
+        struct = object(schema);
+        cache.set(tag, struct);
+      }
+
+      return struct.validator(value, ctx);
+    },
+    *entries(value, ctx) {
+      if (!isObject(value)) {
+        return;
+      }
+
+      const tag = (value as any)[discriminant];
+      if (typeof tag !== "string" || !options[tag]) {
+        return;
+      }
+
+      let struct = cache.get(tag);
+      if (!struct) {
+        const schema = {
+          ...options[tag],
+          [discriminant]: literal(tag),
+        };
+        struct = object(schema);
+        cache.set(tag, struct);
+      }
+
+      yield* struct.entries(value, ctx);
+    },
+  });
+}
+
 export function defineType<Type extends Struct<any>>(
   name: string,
   schemaType: Type,
